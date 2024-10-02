@@ -159,7 +159,9 @@ class Environment:
             mechanism_ll = torch.tensor(0.)
             if targets is not None:
                 try:
+                    print('trying to execute mll')
                     mechanism_ll = self.mechanisms[node].mll(inputs, targets, prior_mode=False)
+                    print('excepion not occuring')
                 except Exception as e:
                     print(f'Exception occured in Environment.log_likelihood() when computing LL for mechanism {node}:')
                     print(e)

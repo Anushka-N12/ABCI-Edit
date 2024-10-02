@@ -45,7 +45,7 @@ class Mechanism(Module):
         if targets is not None and inputs is not None:
             assert inputs.shape[:-1] == targets.shape, print(f'Batch size mismatch: {inputs.shape} vs.'
                                                              f' {targets.shape}')
-
+            
     def forward(self, inputs: torch.Tensor, prior_mode: bool = False):
         """
         Computes the mechanism output for a given input tensor. Must be implemented by all child classes.
@@ -153,6 +153,10 @@ class GaussianRootNode(Mechanism):
     def mll(self, inputs: torch.Tensor, targets: torch.Tensor, prior_mode=False, reduce=True):
         self._check_args(targets=targets)
         output_shape = targets.shape[:-1]
+
+        # print(f'Targets shape: {targets.shape}')
+        # print(f'Output shape: {output_shape}')
+
         if self.static:
             # evaluate true log-likelihood
             y_dist = dist.Normal(self.mu_0, self.lam_0.pow(-0.5))
@@ -166,10 +170,12 @@ class GaussianRootNode(Mechanism):
             _, kappa_m, alpha_m, beta_m = self.compute_posterior_params(targets, prior_mode)
             lls = torch.lgamma(alpha_m) - torch.lgamma(alpha_n) + alpha_n * beta_n.log() - alpha_m * beta_m.log() + \
                   0.5 * (kappa_n.log() - kappa_m.log()) - 0.5 * targets.shape[-1] * math.log(2. * math.pi)
+        # print(f'LLS shape after log_prob: {lls.shape}')
 
         assert lls.shape == output_shape, print(lls.shape)
         if reduce:
-            return lls.sum()
+            lls_edited = lls.sum()
+            return lls_edited 
         return lls
 
     def expected_noise_entropy(self, prior_mode: bool = False) -> torch.Tensor:
@@ -371,9 +377,13 @@ class GaussianProcess(Mechanism):
     def mll(self, inputs: torch.Tensor, targets: torch.Tensor, prior_mode=False, reduce=True):
         self._check_args(inputs, targets)
         output_shape = targets.shape[:-1]
+
         with gpytorch.settings.prior_mode(prior_mode):
             self.gp.select_hyperparameters(prior_mode)
             f_dist = self.gp(inputs)
+
+        print(f'f_dist shape: {f_dist.mean.shape if self.static else f_dist.shape}')
+        print(f'targets shape: {targets.shape}')
 
         if self.static:
             y_dist = self.gp.likelihood(f_dist.mean)
@@ -381,11 +391,15 @@ class GaussianProcess(Mechanism):
         else:
             y_dist = self.gp.likelihood(f_dist)
             mlls = y_dist.log_prob(targets)
-        assert mlls.shape == output_shape, print(f'Invalid shape {mlls.shape}!')
+        
+        print(f'mlls shape after log_prob: {mlls.shape}')
 
+        assert mlls.shape == output_shape, print(f'Invalid shape {mlls.shape}!')
+        
         if reduce:
             return mlls.sum()
         return mlls
+
 
     def expected_noise_entropy(self, prior_mode: bool = False) -> torch.Tensor:
         # use point estimate with the MAP variance
