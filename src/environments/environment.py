@@ -45,7 +45,8 @@ class Environment:
                  num_test_samples_per_intervention: int = 50,
                  num_test_queries: int = 30,
                  interventional_queries: List[InterventionalDistributionsQuery] = None,
-                 graph: nx.DiGraph = None):
+                 graph: nx.DiGraph = None,
+                 base_shapes: Dict = {}):
 
         # generate unique env name
         seed = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(8)])
@@ -56,6 +57,7 @@ class Environment:
         self.graph = self.construct_graph(num_nodes) if graph is None else graph
         self.topological_order = list(nx.topological_sort(self.graph))
         self.node_labels = sorted(list(set(self.graph.nodes)))
+        self.base_shapes = base_shapes
 
         # generate mechanisms
         self.mechanism_model = mechanism_model
@@ -63,7 +65,12 @@ class Environment:
             mechanisms = []
             for node in self.node_labels:
                 parents = get_parents(node, self.graph)
-                mechanisms.append(self.create_mechanism(len(parents)))
+                if self.base_shapes[node]:
+                    mechanisms.append(self.create_mechanism(len(parents)*self.base_shapes[node]))
+                else:
+                # if True:
+                    mechanisms.append(self.create_mechanism(len(parents)))
+                # print(f'created mechanism for node {node} with in_size {len(parents)*self.base_shapes[node]}')
             self.mechanisms = dict(zip(self.node_labels, mechanisms))
         else:
             self.mechanisms = None
@@ -86,12 +93,20 @@ class Environment:
         self.observational_test_data = self.interventional_test_data = None
         self.num_test_samples_per_intervention = num_test_samples_per_intervention
         if num_test_samples_per_intervention > 0:
-            self.observational_test_data = [self.sample({}, 1, num_test_samples_per_intervention)]
+            print(f'Given shape dict is {base_shapes}')
+            if len(base_shapes) > 0:
+                self.observational_test_data = [self.sample({}, 1, num_test_samples_per_intervention, base_shape=base_shapes[list(base_shapes.keys())[0]])]
+            else:
+                self.observational_test_data = [self.sample({}, 1, num_test_samples_per_intervention, 1)]
             self.interventional_test_data = dict()
+            print('starting synthetic data loop')
             for node in self.node_labels:
                 bounds = self.intervention_bounds[node]
                 intr_values = torch.rand(num_test_samples_per_intervention) * (bounds[1] - bounds[0]) + bounds[0]
-                experiments = [self.sample({node: intr_values[i]}, 1) for i in range(num_test_samples_per_intervention)]
+                if len(base_shapes) > 0:
+                    experiments = [self.sample({node: intr_values[i]}, 1, base_shape=self.base_shapes[node]) for i in range(num_test_samples_per_intervention)]
+                else:
+                    experiments = [self.sample({node: intr_values[i]}, 1) for i in range(num_test_samples_per_intervention)]
                 self.interventional_test_data.update({node: experiments})
 
         # generate query test data
@@ -125,22 +140,26 @@ class Environment:
 
         assert False, print(f'Invalid mechanism model {self.mechanism_model}!')
 
-    def sample(self, interventions: dict, batch_size: int, num_batches: int = 1) -> Experiment:
+    def sample(self, interventions: dict, batch_size: int, num_batches: int = 1, base_shape: int = 1) -> Experiment:
         data = dict()
         for node in self.topological_order:
             # check if node is intervened upon
             if node in interventions:
-                samples = torch.ones(num_batches, batch_size, 1) * interventions[node]
+                samples = torch.ones(num_batches, batch_size, base_shape) * interventions[node]
+                print(f'set node {node} data to shape {samples.shape}')
             else:
                 mech = self.mechanisms[node]
 
                 # sample from mechanism
                 parents = get_parents(node, self.graph)
                 if not parents:
-                    samples = mech.sample(torch.empty(num_batches, batch_size, 1))
+                    print(f'given base shape for node {node} is {base_shape}')
+                    samples = mech.sample(torch.empty(num_batches, batch_size, base_shape), base_shape=base_shape)
+                    print(f'set node {node}, with data of shape {samples.shape}')
                 else:
                     x = torch.cat([data[parent] for parent in parents], dim=-1)
-                    assert x.shape == (num_batches, batch_size, mech.in_size), print(f'Invalid shape {x.shape}!')
+                    print(f'node {node} expected shape {(num_batches, batch_size, mech.in_size)}, giving {x.shape}')
+                    # assert x.shape == (num_batches, batch_size, mech.in_size), print(f'Invalid shape {x.shape}!')
                     samples = mech.sample(x)
 
             # store samples
@@ -237,7 +256,8 @@ class Environment:
         self.query_ll = param_dict['query_ll']
         self.mechanisms = dict()
         for key, d in param_dict['mechanism_param_dict'].items():
-            self.mechanisms[key] = self.create_mechanism(d['in_size'])
+            self.mechanisms[key] = self.create_mechanism(d['in_size']*self.base_shapes[key])
+            # print(f'setting insize of {key} to {d['in_size']*self.base_shapes[key]}')
             self.mechanisms[key].load_param_dict(d)
 
         if param_dict['intr_query_param_dicts'] is not None:

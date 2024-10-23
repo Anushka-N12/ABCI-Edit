@@ -9,7 +9,7 @@ from src.models.mechanisms import *
 class Experiment:
     def __init__(self, interventions: dict, data: Dict[str, torch.tensor]):
         num_batches, batch_size = list(data.values())[0].shape[0:2]
-        assert all([node_data.shape == (num_batches, batch_size, 1) for node_data in data.values()])
+        # assert all([node_data.shape == (num_batches, batch_size, 1) for node_data in data.values()])
         self.interventions = interventions
         self.num_batches = num_batches
         self.batch_size = batch_size

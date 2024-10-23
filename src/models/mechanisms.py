@@ -39,7 +39,7 @@ class Mechanism(Module):
         """
         if inputs is not None:
             assert inputs.dim() >= 2 and inputs.shape[-1] == self.in_size, print(
-                f'Ill-shaped inputs: {inputs.shape}')
+                f'Ill-shaped inputs: {inputs.shape}. Expected ends with {self.in_size}')
         if targets is not None:
             assert targets.dim() >= 1, print(f'Ill-shaped targets: {targets.shape}')
         if targets is not None and inputs is not None:
@@ -128,9 +128,9 @@ class GaussianRootNode(Mechanism):
 
         return self.mu_n * torch.ones(output_shape)
 
-    def sample(self, inputs: torch.Tensor, prior_mode=False):
+    def sample(self, inputs: torch.Tensor, prior_mode=False, base_shape=1):
         assert inputs.dim() >= 2
-        output_shape = (*inputs.shape[:-1], 1)
+        output_shape = (*inputs.shape[:-1], base_shape)
 
         if self.static:
             # sample from true distribution

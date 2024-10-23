@@ -16,14 +16,14 @@ class ABCIBase:
         self.num_workers = num_workers
         self.designed_experiments = {}
         self.open_targets = set()
-        if num_workers > 1:
-            self.worker_id = rpc.get_worker_info().id
-            if self.worker_id == 0:
-                self.experimenter_rref = RRef(self)
-                self.designer_rrefs = []
-                for worker_id in range(1, num_workers):
-                    info = rpc.get_worker_info(f'ExperimentDesigner{worker_id}')
-                    self.designer_rrefs.append(remote(info, self.experiment_designer_factory))
+        # if num_workers > 1:                                   # Import not working
+        #     self.worker_id = rpc.get_worker_info().id
+        #     if self.worker_id == 0:
+        #         self.experimenter_rref = RRef(self)
+        #         self.designer_rrefs = []
+        #         for worker_id in range(1, num_workers):
+        #             info = rpc.get_worker_info(f'ExperimentDesigner{worker_id}')
+        #             self.designer_rrefs.append(remote(info, self.experiment_designer_factory))
 
         # init lists
         self.experiments = []

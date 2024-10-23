@@ -41,7 +41,13 @@ class ABCICategoricalGP(ABCIBase):
         # pre-compute env test data stats
         with torch.no_grad():
             num_test_samples = self.env.num_test_samples_per_intervention
+            print('pass 1')
+            tester = self.env.observational_test_data[0]
+            print('num batches', tester.num_batches)
+            print('batch size', tester.batch_size)
+            # print('data', tester.data)
             env_obs_test_ll = self.env.log_likelihood(self.env.observational_test_data) / num_test_samples
+            print('pass 2')
             env_intr_test_lls = {}
             for node, experiments in self.env.interventional_test_data.items():
                 env_intr_test_lls[node] = self.env.log_likelihood(experiments) / num_test_samples
@@ -104,7 +110,7 @@ class ABCICategoricalGP(ABCIBase):
             if num_experiments_conducted == 0 and num_initial_obs_samples > 0:
                 num_samples = num_initial_obs_samples
             self.experiments.append(self.env.sample(interventions, num_samples))
-
+            print(f'Interventions - {interventions} & no. of samples - {num_samples}')
             # set training data for mechanisms
             self.mechanism_model.set_data(self.experiments)
 

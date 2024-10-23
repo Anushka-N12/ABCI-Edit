@@ -94,10 +94,11 @@ class BiDiag(Environment):
                  num_test_samples_per_intervention: int = 50,
                  num_test_queries: int = 0,
                  interventional_queries: List[InterventionalDistributionsQuery] = None,
-                 graph=None):
+                 graph=None,
+                 base_shapes: dict = {}):
         assert num_nodes >= 2
         super().__init__(num_nodes, mechanism_model, frac_non_intervenable_nodes, non_intervenable_nodes,
-                         num_test_samples_per_intervention, num_test_queries, interventional_queries, graph)
+                         num_test_samples_per_intervention, num_test_queries, interventional_queries, graph, base_shapes)
 
     def construct_graph(self, num_nodes: int) -> nx.DiGraph:
         graph = nx.DiGraph()
